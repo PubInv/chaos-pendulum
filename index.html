@@ -8,7 +8,8 @@
     <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
     <link rel="stylesheet" type="text/css" href="stylesheets/github-light.css" media="screen">
     <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print">
-
+    <script src="./build/p2.js"></script>
+    <script src="./build/p2.renderer.js"></script>    
     <!--[if lt IE 9]>
     <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
     <![endif]-->
@@ -28,6 +29,51 @@
     <div id="content-wrapper">
       <div class="inner clearfix">
         <section id="main-content">
+    <section id="visualsection" style="{border: red;}">
+    </section>
+    <section id="textsection" style="{border: red;}">
+    <button onclick="start_trial()">Start!</button>
+    <button onclick="tick()">Tick!</button>
+    <style>
+#table-wrapper {
+  position:relative;
+}
+#table-scroll {
+  height:150px;
+  overflow:auto;  
+  margin-top:20px;
+}
+#table-wrapper table {
+  width:100%;
+
+}
+#table-wrapper table * {
+  color:black;
+}
+#table-wrapper table thead th .text {
+  position:absolute;   
+  top:-20px;
+  z-index:2;
+  height:20px;
+  width:35%;
+  border:1px solid red;
+}    
+    </style>
+<div id="table-wrapper">
+  <div id="table-scroll">
+    <table id="trialtable">
+     <tr>
+    <th>Tick</th>
+    <th>Time</th>
+    <th>Single</th>
+    <th>Double</th>
+    <th>Distance To Closest Trace</th>    
+    </tr>
+    </table>
+  </div>
+</div>    
+    </section>
+	  
           <h3>
 <a id="welcome-to-github-pages" class="anchor" href="#welcome-to-github-pages" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Welcome to GitHub Pages.</h3>
 
@@ -70,6 +116,535 @@
         </aside>
       </div>
     </div>
+
+        <script>
+
+/* TODO:
+
+-- make the arm short enough to pass through the pivot to make it physically realizable
+-- draw borders around the rectangles
+-- detect ticks
+-- draw table 
+-- add a button to start game
+-- change to simply raising both systems
+
+This stuff is harder:
+-- Stop game when the trace is new and report "Congratulations, you found new trace never found before!" 
+"It took X seconds".
+-- need a way to store the traces
+
+*/ 
+    var w, h, canvas, ctx, circleBody;
+var bodies = {};
+var bgraphs = {};
+
+// These time series will be used to compute the distance
+var current_time_series = [];
+var last_time_series = [];
+
+var renderer, stage, container, graphics, zoom,boxShape, boxBody, planeBody, planeShape;
+
+// I THINK P2.js uses the KMS system of units.
+var L = 1.0; // Let's assume a 1 meter length!!!
+var L1 = L/2;
+var L2 = L/3;
+
+var DEGREES_OF_VARIATION = 4;
+
+// This is meters!
+var DIVERGENCE_DEFINITION = 0.4; 
+
+var ANGULAR_DAMPING = 0.02; // (Between 1.0 and 0.0)
+var LINEAR_DAMPING = 0.02; // (Between 1.0 and 0.0)
+    
+var origin = [0,0];
+var SL = L*2;
+var TL = 1.0;
+var r1 = 6;
+var r2 = 4;
+var L1 = SL*TL*r1/(r1+r2); // First arm
+var L2 = SL*TL*r2/(r1+r2); // Second arm
+
+var initial_angle_deg = 70, // raise angle, ccw from x axis, in degrees.
+    initial_angle = (initial_angle_deg/360) * 2.0 * Math.PI;
+
+var hang_angle_deg = 270,
+    hang_angle = (hang_angle_deg/360) * 2.0 * Math.PI;    
+
+var single_arm_pos = [origin[0] + Math.cos(initial_angle)*SL/2 , origin[1] + Math.sin(initial_angle)*SL/2 ];
+
+var d1_arm_pos = [origin[0] + Math.cos(initial_angle)*L1/2 , origin[1] + Math.sin(initial_angle)*L1/2 ];
+var d2_arm_pos = [d1_arm_pos[0] + Math.cos(initial_angle)*L1/2 +  Math.cos(hang_angle)*(L2)/2,
+		  d1_arm_pos[1] + Math.sin(initial_angle)*L1/2 +  Math.sin(hang_angle)*(L2)/2];
+
+ var PLAYER = Math.pow(2,0),
+                        SINGLE =  Math.pow(2,1),
+                        DOUBLE = Math.pow(2,2)
+
+var GRAVITY = -9.82;
+// This is used to slow the system down for testing.
+var GRAVITY_SLOWDOWN = 0.1;
+var buttons = {
+    space : false,
+    left :  false,
+    right : false,
+}
+var sarmBody;
+
+var armBody;
+var secondArmBody;
+
+var world;
+var dummyBody1;
+var dummyBody2;
+
+var initAngVel = 5;
+
+
+function start_trial() {
+    last_time_series = current_time_series;
+    current_time_series = [];
+    reset_single_pendulum();
+    reset_double_pendulum();
+    firstTime = null;
+    lastReportedTime = null;
+    ticks = null;
+    lastReportTime = null;
+}
+
+
+function random_color() {
+    return '0x'+Math.floor(Math.random()*16777215).toString(16);
+}
+
+function gen_row(tick,time,s,d,closest) {
+    return 
+    "<tr>" +
+	"</tr>";
+}
+
+function debug_time_series_distance(t1,t2) {
+    for(var i = 0; i < Math.min(t1.length,t2.length); i++) {
+	var a = t1[i][3];
+	var b = t2[i][3];
+	console.log("i = a, b : "+ i + " = " + a+" , " + b);
+	console.log(distance(a,b));	
+    }
+}
+// This could be replaced with a binary search
+function get_value_from_time_series(ts,t) {
+    for(var i = 0; i < ts.length; i++) {
+	var entry = ts[i];
+	if (entry[0] >= t) {
+	    return entry;
+	}
+    }
+    return null;
+}
+
+function tick(ticks,time) {
+    add_row(ticks,time);
+}
+function distance(v1,v2) {
+    var dx = v1[0]-v2[0];
+    var dy = v1[1]-v2[1];
+    return Math.sqrt(dx*dx + dy*dy);
+}
+function add_row(ticks,time) {
+    var table = document.getElementById("trialtable");
+    // Note adding in Math.PI/2 here creates creates a system of positive degrees to the right, negative to the left, probably what we want...
+    var s = (bodies["sarmBody"].angle + Math.PI/2) * 180 / Math.PI;
+    var d = ( Math.PI/2 + Math.atan2(bodies["secondArmBody"].position[1],bodies["secondArmBody"].position[0]))*180/Math.PI;
+
+    var row = table.insertRow(1);
+    var cell1 = row.insertCell(0);
+    var cell2 = row.insertCell(1);
+    var cell3 = row.insertCell(2);
+    var cell4 = row.insertCell(3);
+    var cell5 = row.insertCell(4);
+    cell1.innerHTML = ""+ticks;
+    cell2.innerHTML = ""+time.toFixed(2) + " s";    
+    cell3.innerHTML = ""+s.toFixed(2) +  " degrees";
+    cell4.innerHTML = ""+d.toFixed(2) +  " degrees";
+
+    var dist_string;
+    var dist;
+    var entry
+    if (last_time_series && 
+	(entry = get_value_from_time_series(last_time_series,time))) {
+	var len = current_time_series.length;
+	var b = bodies["secondArmBody"];
+	var cur = find_tip_of_second_arm(b);
+	// NOTE: I should be able to use the vec2 library for this, but can't figure out how to include it!
+        dist = distance(cur,entry[3]);
+	graphics.lineStyle(0.01,"0x000000");
+	graphics.moveTo(cur[0],cur[1]);
+	graphics.lineTo(entry[3][0],entry[3][1]);
+	dist_string = "" + dist.toFixed(2) + "m";
+    } else {
+	dist = 0.0;
+	dist_string = "NA";
+    }
+    
+    cell5.innerHTML = ""+dist_string;
+    if (dist >= DIVERGENCE_DEFINITION) {
+	start_trial();
+    }
+}
+
+init();
+
+requestAnimationFrame(animate);
+
+function init_world() {
+    world = new p2.World({
+        gravity : [0,GRAVITY*GRAVITY_SLOWDOWN]
+    });
+
+    world.solver.iterations = 30;
+    world.solver.tolerance = 0.01;
+
+    // Create static dummy body that we can constrain other bodies to
+
+    init_double_pendulum();
+    init_single_pendulum();
+
+}
+
+function init(){
+
+    init_world();
+    // Pixi.js zoom level
+    zoom = 150;
+
+    var section = document.getElementById("visualsection");
+    // Initialize the stage
+    var w = section.offsetWidth;
+    var h = section.offsetHeight;
+    
+    renderer =  PIXI.autoDetectRenderer(w, h),
+    stage = new PIXI.Stage(0xFFFFFF);
+
+    // We use a container inside the stage for all our content
+    // This enables us to zoom and translate the content
+    container =     new PIXI.DisplayObjectContainer(),
+    
+    stage.addChild(container);
+
+    // Add the canvas to the DOM
+    var section = document.getElementById("visualsection");
+    section.appendChild(renderer.view);
+
+    // Add transform to the container
+    container.position.x =  renderer.width/2; // center at origin
+    container.position.y =  renderer.height/2;
+    container.scale.x =  zoom;  // zoom in
+    container.scale.y = -zoom; // Note: we flip the y axis to make "up" the physics "up"
+
+
+    // Draw the box.
+    graphics = new PIXI.Graphics();
+
+    add_bodies(container,bodies);
+    // Add the box to our container
+    container.addChild(graphics);
+}
+
+function add_bodies(container,bodies,graphics) {
+    for (var key in bodies) {
+	var b = bodies[key];
+        // Draw the box.
+        var g = new PIXI.Graphics();
+	bgraphs[key] = g;
+	g.beginFill(b.color);
+	var w = b.shapes[0].width;
+	var h = b.shapes[0].height;
+	g.drawRect(-w/2, -h/2, w, h);
+	container.addChild(g);
+    }
+
+}
+
+function normalizeAngle(angle){
+                        angle = angle % (2*Math.PI);
+                        if(angle < 0){
+                            angle += (2*Math.PI);
+                        }
+                        return angle;
+}
+
+function find_tip_of_second_arm(b) {
+    var theta = normalizeAngle(b.angle);
+    theta = normalizeAngle(theta);
+    var len = L2/2;
+    var pos = [b.position[0]+len*Math.cos(theta),b.position[1]+len*Math.sin(theta)];
+    return pos;
+}
+function drawBodies(graphics,bs,gs) {
+    for (var key in bodies) {
+	var b = bodies[key];
+	var g = gs[key];
+	// Transfer positions of the physics objects to Pixi.js
+	g.position.x = b.position[0];
+	g.position.y = b.position[1];
+	g.rotation =   b.angle;
+
+	if (b.name == "secondArmBody") {
+	    graphics.beginFill(b.color);
+/*	    var theta = normalizeAngle(b.angle);
+	    theta = normalizeAngle(theta);
+	    var len = L2/2;
+	    var pos = [b.position[0]+len*Math.cos(theta),b.position[1]+len*Math.sin(theta)];
+*/
+	    pos = find_tip_of_second_arm(b);
+	    graphics.drawRect(pos[0], pos[1], 0.03, 0.03);	    
+	}
+    }
+}
+
+// all times in milliseconds, I guess.
+var maxSubSteps = 5; // Max physics ticks per render frame
+var fixedDeltaTime = 1 / 60; // Physics "tick" delta time
+var lastReportedTime;
+var lastTime;
+var firstTime;
+var ticks = 0;
+// Animation loop
+function animate(time){
+    time = time || 0;
+    lastTime = lastTime || time;
+    lastReportedTime = lastReportedTime || 0;
+    firstTime = firstTime || time;
+
+    // Now let us record the time series stuff....
+
+    var s = (bodies["sarmBody"].angle + Math.PI/2) * 180 / Math.PI;
+    var d = ( Math.PI/2 + Math.atan2(bodies["secondArmBody"].position[1],bodies["secondArmBody"].position[0]))*180/Math.PI;
+
+    var b = bodies["secondArmBody"];
+    var pos = find_tip_of_second_arm(b);
+    current_time_series.push([(lastTime-firstTime)/1000,s,d,[pos[0],pos[1]]]);
+
+    // Now compute the next step
+    
+    var deltaTime = lastTime ? (time - lastTime) / 1000 : 0;
+    lastTime = time;
+
+    if ((lastTime - lastReportedTime) >= 1000) {
+	tick(ticks,(lastTime-firstTime)/1000);
+	ticks++;
+	lastReportedTime = lastTime;
+    }
+    // Make sure the time delta is not too big (can happen if user switches browser tab)
+    deltaTime = Math.min(1 / 10, deltaTime);
+
+    fixedDeltaTime = 1/60;
+    // Move physics bodies forward in time
+    world.step(fixedDeltaTime, deltaTime, maxSubSteps);
+
+    drawBodies(graphics,bodies,bgraphs);
+    // Render scene
+    renderer.render(stage);
+    
+    requestAnimationFrame(animate);    
+}
+
+// Get current time, in seconds.
+function time(){
+    return new Date().getTime() / 1000;
+}
+
+
+function init_double_pendulum() 
+{
+    // Create arm
+
+    // Create static dummy body that we can constrain other bodies to
+    dummyBody2 = new p2.Body({
+        mass: 0,
+    });
+    world.addBody(dummyBody2);
+    
+    var armShape =  new p2.Box({ width: L1, height: 0.1*L });
+    armShape.collisionGroup = DOUBLE;            
+    armBody = new p2.Body({
+        mass: 2,
+	position: [L1/2,0],
+    });
+    armBody.addShape(armShape,d1_arm_pos,initial_angle_deg);
+    
+    armBody.velocity = [0,0];
+    
+    armBody.angularVelocity = 0;
+    
+
+    armBody.name = "armBody";
+    world.addBody(armBody);
+    armBody.color =  "0xffff00";
+
+    bodies[armBody.name] = armBody;
+
+    // Constrain it to the world
+    var c = new p2.RevoluteConstraint(armBody, dummyBody2, {
+        worldPivot: origin,
+        collideConnected: false
+    });
+
+    world.addConstraint(c);
+
+    // SecondArm
+    var secondArmShape = new p2.Box({ width: L2, height: 0.1*L });
+    armShape.collisionGroup = DOUBLE;            
+    secondArmBody = new p2.Body({
+        mass: 2,
+	position: d2_arm_pos,
+	angle: 0,
+    });
+
+    secondArmBody.velocity = [0,0];
+    secondArmBody.angularVelocity = 0;    
+
+
+    secondArmBody.addShape(secondArmShape);
+    secondArmBody.name = "secondArmBody";
+    secondArmBody.color = "0xf00f00";
+    world.addBody(secondArmBody);
+
+    bodies[secondArmBody.name] = secondArmBody;    
+
+    // Connect secondArm to arm
+
+    var c3 = new p2.RevoluteConstraint( armBody,secondArmBody, {
+        localPivotA:
+	    [L1/2 ,
+	     0],
+	localPivotB:
+	[-L2/2,0],
+        collideConnected: false
+    });
+    world.addConstraint(c3);
+    
+    armBody.angle = initial_angle;
+    secondArmBody.angle = hang_angle;
+    world.step(1/60);
+    armBody.angle = initial_angle;
+    secondArmBody.angle = hang_angle;
+        world.step(1/60);
+    armBody.angle = initial_angle;
+    secondArmBody.angle = hang_angle;
+
+    secondArmBody.angularDamping = ANGULAR_DAMPING;
+    secondArmBody.damping = LINEAR_DAMPING;        
+
+    armBody.angularDamping = ANGULAR_DAMPING;
+    armBody.damping = LINEAR_DAMPING;        
+
+    
+}
+
+function init_single_pendulum()
+{
+    dummyBody1 = new p2.Body({
+        mass: 0,
+    });
+    world.addBody(dummyBody1);
+    
+    // Create arm
+    var sarmShape =  new p2.Box({ width: SL, height: 0.1*L });
+    sarmShape.collisionGroup = SINGLE;        
+    sarmBody = new p2.Body({
+        mass:4,
+	position: single_arm_pos,
+    });
+    sarmBody.addShape(sarmShape);
+    sarmBody.color =  "0x0000ff";
+    sarmBody.name = "sarmBody";
+    
+    sarmBody.angle = initial_angle;
+    
+    world.addBody(sarmBody);
+
+    bodies[sarmBody.name] = sarmBody; 
+    
+    // Constrain it to the world
+    var c = new p2.RevoluteConstraint(sarmBody, dummyBody1, {
+        worldPivot: origin,
+        collideConnected: false
+    });
+    world.addConstraint(c);
+
+    sarmBody.angle = initial_angle;
+    sarmBody.velocity = [0,0];
+    sarmBody.angularVelocity = 0;
+    sarmBody.angularDamping = ANGULAR_DAMPING;
+    sarmBody.damping = LINEAR_DAMPING;        
+    
+}
+
+function reset_double_pendulum()
+{
+    world.removeBody(armBody);
+    world.removeBody(secondArmBody);    
+    world.removeBody(dummyBody2);    
+    init_double_pendulum();
+
+    var random_degree = Math.random() * DEGREES_OF_VARIATION;
+    var random_rads = (random_degree / 360) * 2.0 * Math.PI;
+    armBody.angle = initial_angle+random_rads;
+    armBody.velocity = [0,0];
+    armBody.angularVelocity = 0;
+    armBody.angularDamping = ANGULAR_DAMPING;
+    armBody.damping = LINEAR_DAMPING;        
+    
+    secondArmBody.angle = hang_angle;
+    secondArmBody.velocity = [0,0];
+    secondArmBody.angularVelocity = 0;
+    secondArmBody.angularDamping = ANGULAR_DAMPING;
+    secondArmBody.damping = LINEAR_DAMPING;            
+    
+    secondArmBody.color = random_color();
+}
+
+function reset_single_pendulum()
+{
+    world.removeBody(sarmBody);
+    world.removeBody(dummyBody1);    
+    init_single_pendulum();
+}
+
+window.onkeydown = function(event){
+    switch(event.keyCode){
+    case 38: // up
+    case 32: // space
+        if(!buttons.space){
+	    start_trial();
+	    buttons.space = true;
+        }
+        break;
+    case 39: // right
+        buttons.right = true;
+        break;
+    case 37: // left
+        buttons.left = true;
+        break;
+    }
+}
+
+window.onkeyup = function(event){
+    switch(event.keyCode){
+    case 38: // up
+    case 32: // space
+        buttons.space = false;
+        break;
+    case 39: // right
+        buttons.right = false;
+        break;
+    case 37: // left
+        buttons.left = false;
+        break;
+    }
+}
+    </script>
 
   
   </body>
