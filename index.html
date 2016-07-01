@@ -40,7 +40,13 @@
   height:20px;
   width:35%;
   border:1px solid red;
-}    
+}
+
+.newtrace {
+    color: red;
+    font-size: large;
+    background-color: yellow;
+}
 </style>
     
   <body>
@@ -106,6 +112,10 @@
       </div>
     </div>
 
+
+<audio id="play" src="http://www.soundjay.com/button/beep-07.wav"></audio>
+
+<button onclick="playSound()">Play</button>
         <script>
 
 /* TODO:
@@ -199,9 +209,16 @@ function start_trial() {
     paused = false;
 }
 
+function playSound () {
+    document.getElementById('play').play();
+}
+
+
 var paused = false;
 function pause() {
     paused = !paused;
+    if (!paused) 
+        requestAnimationFrame(animate);    
 }
 
 function random_color() {
@@ -280,9 +297,10 @@ function add_row(ticks,time) {
     }
     
     cell5.innerHTML = ""+dist_string;
-    if (dist >= DIVERGENCE_DEFINITION) {
+    if (dist >= DIVERGENCE_DEFINITION || b["newtrace"]) {
 	b.color = "0xff0000";
 	b["newtrace"] = true;
+	row.setAttribute("class", "newtrace");
     }
     if (ticks >= MAX_NUM_TICKS) {
 	start_trial();
@@ -403,6 +421,9 @@ var firstTime;
 var ticks = 0;
 // Animation loop
 function animate(time){
+    
+    if (paused) return;
+    
     time = time || 0;
     lastTime = lastTime || time;
     lastReportedTime = lastReportedTime || 0;
