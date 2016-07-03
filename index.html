@@ -14,9 +14,23 @@
     <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
     <![endif]-->
 
+    <!-- jquery ui stuff -->
+
+    <script   src="https://code.jquery.com/jquery-1.12.4.min.js"   integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ="   crossorigin="anonymous"></script>
+
+
+    
+    <link rel="stylesheet" href="./jquery-ui-1.11.4.custom/jquery-ui.min.css">
+    <link rel="stylesheet" href="./jquery-ui-1.11.4.custom/jquery-ui.structure.min.css">    
+    <link rel="stylesheet" href="./jquery-ui-1.11.4.custom/jquery-ui.theme.min.css">
+
+    <script src="./jquery-ui-1.11.4.custom/jquery-ui.js"></script>
+
     <title>Chaos-pendulum by PubInv</title>
     </head>
-    
+
+</body>
+</html>
     <style>
 #table-wrapper {
   position:relative;
@@ -69,6 +83,14 @@
     <button onclick="my_clear()">Clear Traces</button>
     <button onclick="toggle_sound()">Toggle Sound</button>
     <button onclick="toggle_bracelet()">Toggle Bracelet Debug Lines</button>
+
+
+<p>
+  <label for="amount">Initial Angle</label>
+  <input type="text" id="amount" readonly style="border:0; color:#f6931f; font-weight:bold;">
+</p>
+<div id="angle-range-max"></div>
+ 
     </section>
     
     <h1> Chaos! </h1>
@@ -185,8 +207,8 @@ var r2 = 4;
 var L1 = SL*TL*r1/(r1+r2); // First arm
 var L2 = SL*TL*r2/(r1+r2); // Second arm
 
-var TICK_MS = 100;
-var MAX_NUM_TICKS = 200;
+var TICK_MS = 500;
+var MAX_NUM_TICKS = 40;
 
 
 
@@ -197,11 +219,14 @@ var initial_angle_deg = 70, // raise angle, ccw from x axis, in degrees.
 var hang_angle_deg = 270,
     hang_angle = (hang_angle_deg/360) * 2.0 * Math.PI;    
 
-var single_arm_pos = [origin[0] + Math.cos(initial_angle)*SL/2 , origin[1] + Math.sin(initial_angle)*SL/2 ];
+var single_arm_pos;
+var d1_arm_pos;    
+var d2_arm_pos;
 
-var d1_arm_pos = [origin[0] + Math.cos(initial_angle)*L1/2 , origin[1] + Math.sin(initial_angle)*L1/2 ];
-var d2_arm_pos = [d1_arm_pos[0] + Math.cos(initial_angle)*L1/2 +  Math.cos(hang_angle)*(L2)/2,
-		  d1_arm_pos[1] + Math.sin(initial_angle)*L1/2 +  Math.sin(hang_angle)*(L2)/2];
+single_arm_pos = [origin[0] + Math.cos(initial_angle)*SL/2 , origin[1] + Math.sin(initial_angle)*SL/2 ];
+d1_arm_pos = [origin[0] + Math.cos(initial_angle)*L1/2 , origin[1] + Math.sin(initial_angle)*L1/2 ];
+d2_arm_pos = [d1_arm_pos[0] + Math.cos(initial_angle)*L1/2 +  Math.cos(hang_angle)*(L2)/2,
+	      d1_arm_pos[1] + Math.sin(initial_angle)*L1/2 +  Math.sin(hang_angle)*(L2)/2];
 
  var PLAYER = Math.pow(2,0),
                         SINGLE =  Math.pow(2,1),
@@ -223,10 +248,6 @@ var secondArmBody;
 var world;
 var dummyBody1;
 var dummyBody2;
-
-var initAngVel = 5;
-
-
 
 var divergence_interval = [-1,[]];
 
@@ -254,6 +275,7 @@ function playSound (id) {
     if (sound_on)    
     document.getElementById(id).play();
 }
+
 
 
 var paused = false;
@@ -598,6 +620,7 @@ function drawBodies(graphics,bs,gs) {
 
 	if (b.name == "secondArmBody") {
 	    graphics.beginFill(b.color);
+    	    graphics.lineStyle(0.01,b.color,1);	    
 	    pos = find_tip_of_second_arm(b);
 	    graphics.drawRect(pos[0], pos[1], 0.01, 0.01);	    
 	}
@@ -862,6 +885,31 @@ window.onkeyup = function(event){
         break;
     }
 }
+
+
+
+
+$(function() {
+    $( "#angle-range-max" ).slider({
+      range: "max",
+      min: 30,
+      max: 80,
+      value: 70,
+      slide: function( event, ui ) {
+	  $( "#amount" ).val( ui.value );
+	  initial_angle_deg = ui.value, // raise angle, ccw from x axis, in degrees.
+	  initial_angle = (initial_angle_deg/360) * 2.0 * Math.PI;
+	  single_arm_pos = [origin[0] + Math.cos(initial_angle)*SL/2 , origin[1] + Math.sin(initial_angle)*SL/2 ];
+	  d1_arm_pos = [origin[0] + Math.cos(initial_angle)*L1/2 , origin[1] + Math.sin(initial_angle)*L1/2 ];
+	  d2_arm_pos = [d1_arm_pos[0] + Math.cos(initial_angle)*L1/2 +  Math.cos(hang_angle)*(L2)/2,
+			d1_arm_pos[1] + Math.sin(initial_angle)*L1/2 +  Math.sin(hang_angle)*(L2)/2];
+	  
+      }
+    });
+    $( "#amount" ).val( $( "#angle-range-max" ).slider( "value" ) );
+  });
+
+
     </script>
 
   
