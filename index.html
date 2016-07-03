@@ -136,16 +136,18 @@ purpose two-dimensional physics engine <a href="https://schteppe.github.io/p2.js
 /* TODO:
 
 -- draw borders around the rectangles
-
-This stuff is harder:
--- Stop game when the trace is new and report "Congratulations, you found new trace never found before!" 
-"It took X seconds".
--- need a way to store the traces
 -- Create the trace for the single pendulum and do the same computation there.
 -- Allow everything to be parameterized.
 -- Add a way to set the angles by handle.
 -- Add a message banner!
 -- Say "Weclome Rascally Rabbit!"
+-- Create the bracelet motion exercise.
+
+
+This stuff is harder:
+-- Stop game when the trace is new and report "Congratulations, you found new trace never found before!" 
+"It took X seconds".
+-- need a way to store the traces
 
 */ 
     var w, h, canvas, ctx, circleBody;
@@ -217,6 +219,7 @@ var initAngVel = 5;
 
 var MAX_NUM_TICKS = 20;
 
+var divergence_interval = [-1,[]];
 
 function start_trial() {
     last_time_series = current_time_series;
@@ -234,6 +237,7 @@ function start_trial() {
     ticks = null;
     lastReportTime = null;
     paused = false;
+    divergence_interval = [-1,[]];
 }
 
 function playSound (id) {
@@ -288,6 +292,122 @@ function get_value_from_time_series(ts,t) {
     return null;
 }
 
+
+// Here is my attempt to develop an an online-algorithm for determining
+// the point of divergence between two time series.
+//
+// inputs:
+// ol - online time series which is growing.
+// i -- the index of the point to test (probably the index of the last value in online in online usage)
+// ts - the time series we are testing against.
+// ds - a pair, consisting of the next index to process from, and an interval. the last region computed by diverge (i-1) (the empty set set at start).
+// ds = [p,[start,finish]] --- p means the point p has start and finish interval.
+// b -- the "bracelet" distance
+// Note a region is an interval [j,k] where j is a contained member, but k is not.
+// if j == k, there are not elmentes in the interval.
+// An empty array [] corresponds to an interval with no elements.
+// 
+// 
+// outputs:
+// The regions (ds) for the new point.
+//
+function diverge(ol,i,ts,ds,b) {
+    var p = ds[0];
+    if ((ds[1].length == 0) && p >= 0) return ds;
+    if (i >= ol.length) return ds;
+    
+
+    // This is weird, I should probably use an object instead of an array here..
+    if (p < 0) p = 0;
+    var ret = [];
+    while(p <= i) {
+	var x = ol[p][3][0];
+	var y = ol[p][3][1];
+	// first we advance the end of the interval as far as possible.
+	var finish = (ds[1].length == 0) ? 0 : ds[1][1];
+	var done = false;
+	while(!done && finish < ts.length) {
+	    var d = distance([x,y],ts[finish][3]);
+	    if (d <= b) {
+		finish++;
+	    } else {
+		done = true;
+	    }
+	}
+	ret[1] = finish;
+	// now adance the back of the interval as required.
+	done = false;
+    
+	var start = (ds[1].length == 0) ? 0 : ds[1][0];
+	var done = false;
+	while(!done && start < finish) {
+	    var d = distance([x,y],ts[start][3]);
+	    if (d > b) {
+		start++;
+	    } else {
+		done = true;
+	    }
+	}
+	ds[1][0] = start;
+	ds[1][1] = finish;
+	ret[0] = p;
+	ret[1] = [start,finish];
+	p++;
+    }
+    if (ret[1][0] == ret[1][1]) {
+	console.log(ret);
+	console.log("returning nothing");
+	return [p,[]];
+    }
+    console.log(ret);
+    return ret;
+}
+
+Array.prototype.compare = function(testArr) {
+    if (this.length != testArr.length) return false;
+    for (var i = 0; i < testArr.length; i++) {
+        if (this[i].compare) { 
+            if (!this[i].compare(testArr[i])) return false;
+        }
+        if (this[i] !== testArr[i]) return false;
+    }
+    return true;
+}
+
+
+
+// Create two time series and see when they diverge.
+function test_diverge0() {
+    var t = [[0,null,null,[0,0]],
+	     [1,null,null,[1,1]],
+	     [2,null,null,[2,2]],
+	     [3,null,null,[3,3]],
+	     [4,null,null,[4,4]]	     
+	    ];
+    var s = [[0,null,null,[0,0]],
+	     [1,null,null,[1.1,1.1]],
+	     [2,null,null,[2.2,2.2]],
+	     [3,null,null,[3.3,3.3]],
+	     [4,null,null,[4.4,4.4]]	     
+	    ];
+    var ds = [-1,[]];
+    var b = 0.3;
+    var divergent = [];
+    for(var i = 0; i < s.length; i++) {
+	ds = diverge(s,i,t,ds,b);
+	console.log(ds);
+	if (ds[1].length == 0) {
+	    divergent.push(i);
+	}
+    }
+    if (divergent.compare([3,4])) {
+	console.log("Success!");
+    } else {
+	console.log("Failure!");
+    }
+    
+}
+
 function tick(ticks,time) {
     add_row(ticks,time);
 //    playSound('tick');    
@@ -318,17 +438,30 @@ function add_row(ticks,time) {
     var dist_string;
     var dist;
     var entry;
-    if (standard_time_series && 
-	(entry = get_value_from_time_series(standard_time_series,time))) {
+    if (standard_time_series 
+	&&  (entry = get_value_from_time_series(standard_time_series,time))
+       ) {
 	var len = current_time_series.length;
 	var cur = find_tip_of_second_arm(b);
 	// NOTE: I should be able to use the vec2 library for this, but can't figure out how to include it!
         dist = distance(cur,entry[3]);
+	divergence_interval = diverge(current_time_series,current_time_series.length-1,standard_time_series,
+		     divergence_interval,DIVERGENCE_DEFINITION);
 	dist_string = "" + dist.toFixed(2) + "m";
-        if (!b.newtrace) {
-	    graphics.lineStyle(0.01,b.color);
-	    graphics.moveTo(cur[0],cur[1]);
-	    graphics.lineTo(entry[3][0],entry[3][1]);
+        if (!b.newtrace && divergence_interval[1].length > 0) {
+	    var p = divergence_interval[0]; // this is on current_time_series
+	    var start = divergence_interval[1][0];
+	    var finish = divergence_interval[1][1];
+	    console.log(" p start finish "+p+" , "+start + " , "+ finish);
+/*
+	    graphics.moveTo(current_time_series[p][0],current_time_series[p][1]);
+    	    graphics.lineStyle(0.02,"0x000000");
+	    graphics.lineTo(standard_time_series[start][0],standard_time_series[start][1]);
+
+	    graphics.moveTo(current_time_series[p][0],current_time_series[p][1]);	    
+	    graphics.lineStyle(0.02,"0x0000ff");
+	    graphics.lineTo(standard_time_series[finish][0],standard_time_series[finish][1]);
+*/
 	}
     } else {
 	dist = 0.0;
@@ -336,7 +469,11 @@ function add_row(ticks,time) {
     }
     
     cell5.innerHTML = ""+dist_string;
-    if (dist >= DIVERGENCE_DEFINITION || b["newtrace"]) {
+    //    if (dist >= DIVERGENCE_DEFINITION || b["newtrace"]) {
+    if ((divergence_interval[1].length == 0) || b["newtrace"]) {
+	if (standard_time_series) {
+	    var x = 4;
+	}
 	b.color = "0xff0000";
 	b["newtrace"] = true;
 	row.setAttribute("class", "newtrace");
