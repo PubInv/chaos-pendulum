@@ -67,7 +67,8 @@
     <button onclick="start_trial()">Start New Trial!</button>
     <button onclick="pause()">Pause</button>
     <button onclick="my_clear()">Clear Traces</button>
-    <button onclick="toggle_sound()">Toggle Sound</button>        
+    <button onclick="toggle_sound()">Toggle Sound</button>
+    <button onclick="toggle_bracelet()">Toggle Bracelet Debug Lines</button>
     </section>
     
     <h1> Chaos! </h1>
@@ -142,6 +143,8 @@ purpose two-dimensional physics engine <a href="https://schteppe.github.io/p2.js
 -- Add a message banner!
 -- Say "Weclome Rascally Rabbit!"
 -- Create the bracelet motion exercise.
+-- Provide a way to slow things down.
+-- Fully test the "bracelet" algorithm.
 
 
 This stuff is harder:
@@ -169,7 +172,7 @@ var L2 = L/3;
 var DEGREES_OF_VARIATION = 4;
 
 // This is meters!
-var DIVERGENCE_DEFINITION = 0.4; 
+var DIVERGENCE_DEFINITION = 0.3; 
 
 var ANGULAR_DAMPING = 0.02; // (Between 1.0 and 0.0)
 var LINEAR_DAMPING = 0.02; // (Between 1.0 and 0.0)
@@ -181,6 +184,12 @@ var r1 = 6;
 var r2 = 4;
 var L1 = SL*TL*r1/(r1+r2); // First arm
 var L2 = SL*TL*r2/(r1+r2); // Second arm
+
+var TICK_MS = 100;
+var MAX_NUM_TICKS = 200;
+
+
+
 
 var initial_angle_deg = 70, // raise angle, ccw from x axis, in degrees.
     initial_angle = (initial_angle_deg/360) * 2.0 * Math.PI;
@@ -217,7 +226,7 @@ var dummyBody2;
 
 var initAngVel = 5;
 
-var MAX_NUM_TICKS = 20;
+
 
 var divergence_interval = [-1,[]];
 
@@ -238,6 +247,7 @@ function start_trial() {
     lastReportTime = null;
     paused = false;
     divergence_interval = [-1,[]];
+    new_trace_toggle = false;    
 }
 
 function playSound (id) {
@@ -257,6 +267,11 @@ function toggle_sound() {
     sound_on = !sound_on;
     if (!sound_on)
 	playSound('ding');
+}
+
+var DRAW_BRACELET_DEBUGGING_LINES = true;
+function toggle_bracelet() {
+    DRAW_BRACELET_DEBUGGING_LINES = !DRAW_BRACELET_DEBUGGING_LINES;
 }
 
 function my_clear() {
@@ -359,7 +374,6 @@ function diverge(ol,i,ts,ds,b) {
 	console.log("returning nothing");
 	return [p,[]];
     }
-    console.log(ret);
     return ret;
 }
 
@@ -417,6 +431,9 @@ function distance(v1,v2) {
     var dy = v1[1]-v2[1];
     return Math.sqrt(dx*dx + dy*dy);
 }
+
+var new_trace_toggle = false;
+
 function add_row(ticks,time) {
     var table = document.getElementById("trialtable");
     var b = bodies["secondArmBody"];    
@@ -435,47 +452,46 @@ function add_row(ticks,time) {
     cell3.innerHTML = ""+s.toFixed(0) ;
     cell4.innerHTML = ""+d.toFixed(0) ;
 
-    var dist_string;
+    var dist_string = "NA";
     var dist;
     var entry;
-    if (standard_time_series 
-	&&  (entry = get_value_from_time_series(standard_time_series,time))
-       ) {
+    if (standard_time_series) {
 	var len = current_time_series.length;
 	var cur = find_tip_of_second_arm(b);
 	// NOTE: I should be able to use the vec2 library for this, but can't figure out how to include it!
-        dist = distance(cur,entry[3]);
-	divergence_interval = diverge(current_time_series,current_time_series.length-1,standard_time_series,
-		     divergence_interval,DIVERGENCE_DEFINITION);
-	dist_string = "" + dist.toFixed(2) + "m";
-        if (!b.newtrace && divergence_interval[1].length > 0) {
+	divergence_interval = diverge(current_time_series,len-1,standard_time_series,
+				      divergence_interval,DIVERGENCE_DEFINITION);
+	if ((!new_trace_toggle) && (divergence_interval[1].length > 0)) {
 	    var p = divergence_interval[0]; // this is on current_time_series
 	    var start = divergence_interval[1][0];
 	    var finish = divergence_interval[1][1];
-	    console.log(" p start finish "+p+" , "+start + " , "+ finish);
-/*
-	    graphics.moveTo(current_time_series[p][0],current_time_series[p][1]);
-    	    graphics.lineStyle(0.02,"0x000000");
-	    graphics.lineTo(standard_time_series[start][0],standard_time_series[start][1]);
+	    var median = Math.floor((start + finish)/2); // These are indices, so must be ints.
+	    dist = distance(cur,standard_time_series[median][3]);
 
-	    graphics.moveTo(current_time_series[p][0],current_time_series[p][1]);	    
-	    graphics.lineStyle(0.02,"0x0000ff");
-	    graphics.lineTo(standard_time_series[finish][0],standard_time_series[finish][1]);
-*/
+	    dist_string = "" + dist.toFixed(2) + "m";
+
+	    if (DRAW_BRACELET_DEBUGGING_LINES) {
+		console.log("bracelet length = " + (divergence_interval[1][1] - divergence_interval[1][0]));
+		console.log(" p start finish "+p+" , "+start + " , "+ finish);
+		
+		graphics.beginFill("0xFF0000");
+    		graphics.lineStyle(0.01,"0xff0000",1);
+		graphics.moveTo(current_time_series[p][3][0],current_time_series[p][3][1]);
+		graphics.lineTo(standard_time_series[start][3][0],standard_time_series[start][3][1]);
+
+		graphics.beginFill("0x000000");
+		graphics.lineStyle(0.01,"0x000000",1);
+		
+		graphics.moveTo(current_time_series[p][3][0],current_time_series[p][3][1]);
+		graphics.lineTo(standard_time_series[finish][3][0],standard_time_series[finish][3][1]);
+	    }
+	} else {
+	    new_trace_toggle = true;
+	    console.log("NEW TRACE AT: "+ divergence_interval[0]);
 	}
-    } else {
-	dist = 0.0;
-	dist_string = "NA";
     }
-    
     cell5.innerHTML = ""+dist_string;
-    //    if (dist >= DIVERGENCE_DEFINITION || b["newtrace"]) {
-    if ((divergence_interval[1].length == 0) || b["newtrace"]) {
-	if (standard_time_series) {
-	    var x = 4;
-	}
-	b.color = "0xff0000";
-	b["newtrace"] = true;
+    if ( new_trace_toggle) {
 	row.setAttribute("class", "newtrace");
     }
     if (ticks >= MAX_NUM_TICKS) {
@@ -632,8 +648,8 @@ function animate(time){
     var deltaTime = lastTime ? (time - lastTime) / 1000 : 0;
     lastTime = time;
 
-    if ((lastTime - lastReportedTime) >= 1000) {
-	tick(ticks,(lastTime-firstTime)/1000);
+    if ((lastTime - lastReportedTime) >= TICK_MS) {
+	tick(ticks,(lastTime-firstTime)/TICK_MS);
 	ticks++;
 	lastReportedTime = lastTime;
     }
