@@ -78,6 +78,8 @@
     <section id="visualsection" style="{border: red;}">
     </section>
     <section id="textsection" style="{border: red;}">
+    <h1 id="message_banner">
+    </h1>
     <button onclick="start_trial()">Start New Trial!</button>
     <button onclick="pause()">Pause</button>
     <button onclick="my_clear()">Clear Traces</button>
@@ -86,10 +88,29 @@
 
 
 <p>
-  <label for="amount">Initial Angle</label>
-  <input type="text" id="amount" readonly style="border:0; color:#f6931f; font-weight:bold;">
+    <label for="initial_angle_val">Initial Angle (If you move this, the divergence will become incorrect.)</label>
+  <input type="text" id="initial_angle_val" readonly style="border:0; color:#f6931f; font-weight:bold;">
 </p>
-<div id="angle-range-max"></div>
+    <div id="angle_range_max"></div>
+    
+<p>
+    <label for="divergence_definition_val">Distance to count as Divergence (cm)</label>
+  <input type="text" id="divergence_definition_val" readonly style="border:0; color:#f6931f; font-weight:bold;">
+</p>
+    <div id="divergence_definition"></div>
+
+<p>
+    <label for="trial_length_val">Length of Trial (s)</label>
+  <input type="text" id="trial_length_val" readonly style="border:0; color:#f6931f; font-weight:bold;">
+</p>
+    <div id="trial_length_max"></div>
+
+<p>
+    <label for="tick_time_val">Tick Time (ms)</label>
+  <input type="text" id="tick_time_val" readonly style="border:0; color:#f6931f; font-weight:bold;">
+</p>
+    <div id="tick_time_slider"></div>
+
  
     </section>
     
@@ -130,6 +151,24 @@ purpose two-dimensional physics engine <a href="https://schteppe.github.io/p2.js
 
 <a href="mailto:read.robert@gmail.com">Robert L. Read</a> at <a href="https://github.com/PubInv">PubInv</a>.</p>
 
+
+    <section id="trials" style="{border: red;}">
+    
+<div id="table-wrapper">
+  <div id="table-scroll">
+    <table id="trialrecords">
+     <tr>
+    <th>Trial </th>
+    <th>Angle Variation</th>
+    <th>Time To Divergence</th>
+    <th>Divergence Def.</th>
+    </tr>
+    </table>
+  </div>
+</div>    
+    
+    </section>
+
         </section>
 
         <aside id="sidebar">
@@ -158,15 +197,17 @@ purpose two-dimensional physics engine <a href="https://schteppe.github.io/p2.js
 
 /* TODO:
 
+-- Time is being miscoputed somewhere as NUM_TICKS * 1000, but that is variable.
 -- draw borders around the rectangles
 -- Create the trace for the single pendulum and do the same computation there.
 -- Allow everything to be parameterized.
 -- Add a way to set the angles by handle.
 -- Add a message banner!
 -- Say "Weclome Rascally Rabbit!"
--- Create the bracelet motion exercise.
 -- Provide a way to slow things down.
--- Fully test the "bracelet" algorithm.
+-- change pointers to be pretty arrows or human figures
+-- Label traces with initial angle deviation.
+
 
 
 This stuff is harder:
@@ -207,11 +248,12 @@ var r2 = 4;
 var L1 = SL*TL*r1/(r1+r2); // First arm
 var L2 = SL*TL*r2/(r1+r2); // Second arm
 
+var TRIAL_LENGTH = 20; // this is in seconds
 var TICK_MS = 500;
-var MAX_NUM_TICKS = 40;
+var MAX_NUM_TICKS = TRIAL_LENGTH * 1000 / TICK_MS;
 
-
-
+var trial_number = 0;
+var trial_initial_angle_diff = 0;
 
 var initial_angle_deg = 70, // raise angle, ccw from x axis, in degrees.
     initial_angle = (initial_angle_deg/360) * 2.0 * Math.PI;
@@ -258,7 +300,8 @@ function start_trial() {
 	standard_time_series = last_time_series.slice();
     }
     current_time_series = [];
-    var random_degree = Math.random() * DEGREES_OF_VARIATION - DEGREES_OF_VARIATION/2;
+    var random_degree = (Math.random() * DEGREES_OF_VARIATION) - DEGREES_OF_VARIATION/2;
+    trial_initial_angle_diff = random_degree;
     var random_rads = (random_degree / 360) * 2.0 * Math.PI;
     reset_single_pendulum(random_rads);
     reset_double_pendulum(random_rads);
@@ -269,6 +312,23 @@ function start_trial() {
     paused = false;
     divergence_interval = [-1,[]];
     new_trace_toggle = false;    
+}
+
+
+function register_trials(trial,angle,time,divergence_length) {
+    var table = document.getElementById("trialrecords");
+
+    var row = table.insertRow(1);
+    var cell1 = row.insertCell(0);
+    var cell2 = row.insertCell(1);
+    var cell3 = row.insertCell(2);
+    var cell4 = row.insertCell(3);
+    var cell5 = row.insertCell(4);
+    cell1.innerHTML = ""+trial;
+    cell2.innerHTML = ""+angle.toFixed(4);    
+    cell3.innerHTML = ""+time.toFixed(2) ;
+    cell4.innerHTML = ""+divergence_length.toFixed(2) ;
+
 }
 
 function playSound (id) {
@@ -483,35 +543,42 @@ function add_row(ticks,time) {
 	// NOTE: I should be able to use the vec2 library for this, but can't figure out how to include it!
 	divergence_interval = diverge(current_time_series,len-1,standard_time_series,
 				      divergence_interval,DIVERGENCE_DEFINITION);
-	if ((!new_trace_toggle) && (divergence_interval[1].length > 0)) {
-	    var p = divergence_interval[0]; // this is on current_time_series
-	    var start = divergence_interval[1][0];
-	    var finish = divergence_interval[1][1];
-	    var median = Math.floor((start + finish)/2); // These are indices, so must be ints.
-	    dist = distance(cur,standard_time_series[median][3]);
+	if (!new_trace_toggle) {
+	    if (divergence_interval[1].length > 0) {
+		var p = divergence_interval[0]; // this is on current_time_series
+		var start = divergence_interval[1][0];
+		var finish = Math.min(divergence_interval[1][1],standard_time_series.length-1);
+		var median = Math.floor((start + finish)/2); // These are indices, so must be ints.
+		dist = distance(cur,standard_time_series[median][3]);
 
-	    dist_string = "" + dist.toFixed(2) + "m";
+		dist_string = "" + dist.toFixed(2) + "m";
 
-	    if (DRAW_BRACELET_DEBUGGING_LINES) {
-		console.log("bracelet length = " + (divergence_interval[1][1] - divergence_interval[1][0]));
-		console.log(" p start finish "+p+" , "+start + " , "+ finish);
-		
-		graphics.beginFill("0xFF0000");
-    		graphics.lineStyle(0.01,"0xff0000",1);
-		graphics.moveTo(current_time_series[p][3][0],current_time_series[p][3][1]);
-		graphics.lineTo(standard_time_series[start][3][0],standard_time_series[start][3][1]);
+		if (DRAW_BRACELET_DEBUGGING_LINES) {
+		    console.log("bracelet length = " + (divergence_interval[1][1] - divergence_interval[1][0]));
+		    console.log(" p start finish "+p+" , "+start + " , "+ finish);
+		    
+		    graphics.beginFill("0xFF0000");
+    		    graphics.lineStyle(0.01,"0xff0000",1);
+		    graphics.moveTo(current_time_series[p][3][0],current_time_series[p][3][1]);
+		    graphics.lineTo(standard_time_series[start][3][0],standard_time_series[start][3][1]);
 
-		graphics.beginFill("0x000000");
-		graphics.lineStyle(0.01,"0x000000",1);
-		
-		graphics.moveTo(current_time_series[p][3][0],current_time_series[p][3][1]);
-		graphics.lineTo(standard_time_series[finish][3][0],standard_time_series[finish][3][1]);
+		    graphics.beginFill("0x000000");
+		    graphics.lineStyle(0.01,"0x000000",1);
+		    
+		    graphics.moveTo(current_time_series[p][3][0],current_time_series[p][3][1]);
+		    graphics.lineTo(standard_time_series[finish][3][0],standard_time_series[finish][3][1]);
+		}
+	    } else {
+		new_trace_toggle = true;
+		$("#message_banner").text("Congrats! A new trace found at "+time.toFixed(2)+"s");
+		console.log("NEW TRACE AT: "+ divergence_interval[0]);
+		dist_string = "NA";
+		register_trials(trial_number,trial_initial_angle_diff,time,DIVERGENCE_DEFINITION)
+		trial_number++;
 	    }
-	} else {
-	    new_trace_toggle = true;
-	    console.log("NEW TRACE AT: "+ divergence_interval[0]);
 	}
     }
+
     cell5.innerHTML = ""+dist_string;
     if ( new_trace_toggle) {
 	row.setAttribute("class", "newtrace");
@@ -653,7 +720,8 @@ function animate(time){
     var b = bodies["secondArmBody"];
     var f = bodies["armBody"];    
     var pos = find_tip_of_second_arm(b);
-    current_time_series.push([(lastTime-firstTime)/1000,s,d,[pos[0],pos[1]]]);
+    // HACK: is this right?
+    current_time_series.push([(lastTime-firstTime)/TICK_MS,s,d,[pos[0],pos[1]]]);
 
     // Now here is a little trick -- we will play a ding when the arm is close to full extension!!
     if (Math.abs(b.angle - f.angle) < SOUND_ANGLE*Math.PI/180) {
@@ -672,7 +740,7 @@ function animate(time){
     lastTime = time;
 
     if ((lastTime - lastReportedTime) >= TICK_MS) {
-	tick(ticks,(lastTime-firstTime)/TICK_MS);
+	tick(ticks,(lastTime-firstTime)/1000);
 	ticks++;
 	lastReportedTime = lastTime;
     }
@@ -890,13 +958,13 @@ window.onkeyup = function(event){
 
 
 $(function() {
-    $( "#angle-range-max" ).slider({
+    $( "#angle_range_max" ).slider({
       range: "max",
       min: 30,
       max: 80,
       value: 70,
       slide: function( event, ui ) {
-	  $( "#amount" ).val( ui.value );
+	  $( "#initial_angle_val" ).val( ui.value );
 	  initial_angle_deg = ui.value, // raise angle, ccw from x axis, in degrees.
 	  initial_angle = (initial_angle_deg/360) * 2.0 * Math.PI;
 	  single_arm_pos = [origin[0] + Math.cos(initial_angle)*SL/2 , origin[1] + Math.sin(initial_angle)*SL/2 ];
@@ -906,7 +974,56 @@ $(function() {
 	  
       }
     });
-    $( "#amount" ).val( $( "#angle-range-max" ).slider( "value" ) );
+    $( "#initial_angle_val" ).val( $( "#angle_range_max" ).slider( "value" ) );
+  });
+
+
+
+
+$(function() {
+    $( "#divergence_definition" ).slider({
+      range: "max",
+      min: 0.0,
+      max: 100.0,
+      value: DIVERGENCE_DEFINITION * 100,
+      slide: function( event, ui ) {
+	  $( "#divergence_definition_val" ).val( ui.value );
+	  DIVERGENCE_DEFINITION = ui.value / 100.0;
+      }
+    });
+    $( "#divergence_definition_val" ).val( $( "#divergence_definition" ).slider( "value" ) );
+  });
+
+
+$(function() {
+    $( "#trial_length_max" ).slider({
+      range: "max",
+      min: 2,
+      max: 100,
+      value: 20,
+      slide: function( event, ui ) {
+	  $( "#trial_length_val" ).val( ui.value );
+	  TRIAL_LENGTH = ui.value;
+	  MAX_NUM_TICKS = TRIAL_LENGTH * 1000 / TICK_MS;
+      }
+    });
+    $( "#trial_length_val" ).val( $( "#trial_length_max" ).slider( "value" ) );
+  });
+
+
+$(function() {
+    $( "#tick_time_slider" ).slider({
+      range: "max",
+      min: 20,
+      max: 2000,
+      value: 500,
+      slide: function( event, ui ) {
+	  $( "#tick_time_val" ).val( ui.value );
+	  TICK_MS = ui.value;
+	  MAX_NUM_TICKS = TRIAL_LENGTH * 1000 / TICK_MS;
+      }
+    });
+    $( "#tick_time_val" ).val( $( "#tick_time_slider" ).slider( "value" ) );
   });
 
 
