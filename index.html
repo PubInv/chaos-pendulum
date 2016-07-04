@@ -90,28 +90,54 @@
 <p>
     <label for="initial_angle_val">Initial Angle (If you move this, the divergence will become incorrect.)</label>
   <input type="text" id="initial_angle_val" readonly style="border:0; color:#f6931f; font-weight:bold;">
-</p>
     <div id="angle_range_max"></div>
+</p>    
     
 <p>
     <label for="divergence_definition_val">Distance to count as Divergence (cm)</label>
   <input type="text" id="divergence_definition_val" readonly style="border:0; color:#f6931f; font-weight:bold;">
-</p>
     <div id="divergence_definition"></div>
+</p>    
 
 <p>
     <label for="trial_length_val">Length of Trial (s)</label>
   <input type="text" id="trial_length_val" readonly style="border:0; color:#f6931f; font-weight:bold;">
-</p>
     <div id="trial_length_max"></div>
+</p>
+    
 
 <p>
     <label for="tick_time_val">Tick Time (ms)</label>
   <input type="text" id="tick_time_val" readonly style="border:0; color:#f6931f; font-weight:bold;">
-</p>
     <div id="tick_time_slider"></div>
+</p>
+
+
+<p>
+    <label for="random_angle_val">Maximum Random Start Deviation (seconds of degrees, 60 seconds = 1 degree)</label>
+  <input type="text" id="random_angle_val" readonly style="border:0; color:#f6931f; font-weight:bold;">
+    <div id="random_angle_slider"></div>
+</p>
+    
 
  
+</section>
+    
+    <section id="trials" style="{border: red;}">
+    
+<div id="table-wrapper">
+  <div id="table-scroll">
+    <table id="trialrecords">
+     <tr>
+    <th>Trial </th>
+    <th>Angle Variation</th>
+    <th>Time To Divergence</th>
+    <th>Divergence Def.</th>
+    </tr>
+    </table>
+  </div>
+</div>    
+    
     </section>
     
     <h1> Chaos! </h1>
@@ -143,31 +169,24 @@ configurable as some other simulations you may find on the web.
     This simulation does not solve the equations of motion of the double pendulum directly, but rather uses the general
 purpose two-dimensional physics engine <a href="https://schteppe.github.io/p2.js/">p2.js</a>.
     Thanks to Stefan Hedman for this wonderful software!
+
+
+    <h3>Known Bugs</h3>
+    <p>
+    Even if you set the random variation to 0.0 arc seconds, it will eventually diverge due to my inability to
+initialize the physics engine perfectly. One might describe this as "rounding error" but that is a bit too simple.
+    <p>
+    After it has drawn 4 or 5 traces, the rendering engine stops drawing new traces until you hit the "clear traces" button, possibly because we exceed some limit of the number of allowed graphics.
+
     
 <h3>
 <a id="authors-and-contributors" class="anchor" href="#authors-and-contributors" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Authors and Contributors</h3>
 
-    <p><a href="https://github.com/PubInv/chaos-pendulum">Chaos Pendulum</a> is maintained by
+    <p><a href="https://github.com/PubInv/chaos-pendulum">Chaos Pendulum</a> is written and maintained by
 
 <a href="mailto:read.robert@gmail.com">Robert L. Read</a> at <a href="https://github.com/PubInv">PubInv</a>.</p>
 
 
-    <section id="trials" style="{border: red;}">
-    
-<div id="table-wrapper">
-  <div id="table-scroll">
-    <table id="trialrecords">
-     <tr>
-    <th>Trial </th>
-    <th>Angle Variation</th>
-    <th>Time To Divergence</th>
-    <th>Divergence Def.</th>
-    </tr>
-    </table>
-  </div>
-</div>    
-    
-    </section>
 
         </section>
 
@@ -197,16 +216,13 @@ purpose two-dimensional physics engine <a href="https://schteppe.github.io/p2.js
 
 /* TODO:
 
--- Time is being miscoputed somewhere as NUM_TICKS * 1000, but that is variable.
 -- draw borders around the rectangles
 -- Create the trace for the single pendulum and do the same computation there.
 -- Allow everything to be parameterized.
 -- Add a way to set the angles by handle.
--- Add a message banner!
 -- Say "Weclome Rascally Rabbit!"
 -- Provide a way to slow things down.
 -- change pointers to be pretty arrows or human figures
--- Label traces with initial angle deviation.
 
 
 
@@ -232,7 +248,7 @@ var L = 1.0; // Let's assume a 1 meter length!!!
 var L1 = L/2;
 var L2 = L/3;
 
-var DEGREES_OF_VARIATION = 4;
+var DEGREES_OF_VARIATION_A_S = 4*60; // This is in arc-seconds!
 
 // This is meters!
 var DIVERGENCE_DEFINITION = 0.3; 
@@ -300,7 +316,7 @@ function start_trial() {
 	standard_time_series = last_time_series.slice();
     }
     current_time_series = [];
-    var random_degree = (Math.random() * DEGREES_OF_VARIATION) - DEGREES_OF_VARIATION/2;
+    var random_degree = (Math.random() * DEGREES_OF_VARIATION_A_S / 60.0 ) - (DEGREES_OF_VARIATION_A_S / 60.0)/2;
     trial_initial_angle_diff = random_degree;
     var random_rads = (random_degree / 360) * 2.0 * Math.PI;
     reset_single_pendulum(random_rads);
@@ -1024,6 +1040,21 @@ $(function() {
       }
     });
     $( "#tick_time_val" ).val( $( "#tick_time_slider" ).slider( "value" ) );
+  });
+
+$(function() {
+    $( "#random_angle_slider" ).slider({
+      range: "max",
+      min: 0,
+      max: 480,
+      value: 120,
+      slide: function( event, ui ) {
+	  $( "#random_angle_val" ).val( ui.value  );
+	  // We are messaging this is a half-angle, so we multiply by two here!
+	  DEGREES_OF_VARIATION_A_S = ui.value * 2;
+      }
+    });
+    $( "#random_angle_val" ).val( $( "#random_angle_slider" ).slider( "value" ) );
   });
 
 
