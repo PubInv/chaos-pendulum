@@ -216,6 +216,11 @@ initialize the physics engine perfectly. One might describe this as "rounding er
 
 /* TODO:
 
+-- get new and improved version of pixi.js to be able to make much better shapes???
+-- Make it look prettier
+-- convert to My formatting stuff.
+
+
 -- draw borders around the rectangles
 -- Create the trace for the single pendulum and do the same computation there.
 -- Allow everything to be parameterized.
@@ -829,7 +834,10 @@ function init_double_pendulum()
     secondArmBody.velocity = [0,0];
     secondArmBody.angularVelocity = 0;    
 
-
+    
+    armShape.collisionGroup = SINGLE;
+    
+    
     secondArmBody.addShape(secondArmShape);
     secondArmBody.name = "secondArmBody";
     secondArmBody.color = "0x333333";
