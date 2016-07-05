@@ -98,6 +98,18 @@ for the <a href="http://www.montshire.org/">Montshire Museum of Science</a>. It 
 configurable as some other simulations you may find on the web.
 </p>   
 
+    <h3> The Bracelet Algorithm</h3>
+
+    <p>
+    In this software, divergence is defined using an algorithm I call the "bracelet" algorithm.  In general,
+the parameter space of the pendulum includes time. If the pendulum takes a faster path to get to the same point, it is
+clearly different, but the "trace" looks like it is in the same place.  Since this is designed to be educational,
+I wanted a way to define divergence that was purely spatial.  My solution was to write an algorithm that simulates a
+"bracelet" or ring through which both traces are threaded. Divergence is defined to be the point in which the
+bracelet can no longer be moved forward, because the traces have moved to far apart in space.  This allows
+the dimension of "divergence" to be defined purely spatially---in centimeters. 
+</p>   
+
     <h3>Thanks to p2.js</h3>
     This simulation does not solve the equations of motion of the double pendulum directly, but rather uses the general
 purpose two-dimensional physics engine <a href="https://schteppe.github.io/p2.js/">p2.js</a>.
