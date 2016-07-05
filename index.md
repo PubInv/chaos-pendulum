@@ -173,7 +173,11 @@ var current_time_series = [];
 var last_time_series = [];
 var standard_time_series;
 
-var renderer, stage, container, graphics, zoom,boxShape, boxBody, planeBody, planeShape;
+var renderer, stage, container,  zoom,boxShape, boxBody, planeBody, planeShape;
+
+var graphics;
+var standard_graphics;
+
 
 // I THINK P2.js uses the KMS system of units.
 var L = 1.0; // Let's assume a 1 meter length!!!
@@ -566,7 +570,7 @@ function init(){
     var w = section.offsetWidth;
     var h = section.offsetHeight;
     
-    renderer =  PIXI.autoDetectRenderer(w, h),
+    renderer =  PIXI.autoDetectRenderer(w, h,{backgroundColor : "0xFFFFFF"}),
     stage = new PIXI.Stage(0xFFFFFF);
 
     // We use a container inside the stage for all our content
@@ -593,18 +597,42 @@ function init(){
     // Add the box to our container
     container.addChild(graphics);
 }
-
+var bunny;
 function add_bodies(container,bodies,graphics) {
     for (var key in bodies) {
 	var b = bodies[key];
         // Draw the box.
         var g = new PIXI.Graphics();
 	bgraphs[key] = g;
+	if (b.name != "secondArmBody") {	
 	g.beginFill(b.color);
 	var w = b.shapes[0].width;
 	var h = b.shapes[0].height;
 	g.drawRect(-w/2, -h/2, w, h);
-	container.addChild(g);
+	// We want to replace this with the sprite!
+
+	    container.addChild(g);
+	}
+	if (b.name == "secondArmBody") {
+
+	// create the root of the scene graph
+// var stage = new PIXI.Container();
+
+	    // create a texture from an image path
+	    var texture = PIXI.Texture.fromImage('images/noun_196907.png');
+	    
+	    // create a new Sprite using the texture	    
+	    bunny = new PIXI.Sprite(texture);
+	    bunny.anchor.x = 0.45;
+	    bunny.anchor.y = 0;
+	    var sc= L2/8;
+	    var fudge = 1.05;
+	    bunny.scale = new PIXI.Point(sc*fudge,sc*fudge);
+// move the sprite to the center of the screen
+	    bunny.position.x = 0;
+	    bunny.position.y = 0;
+	    stage.addChild(bunny);
+	}
     }
 
 }
@@ -637,7 +665,15 @@ function drawBodies(graphics,bs,gs) {
 	    graphics.beginFill(b.color);
     	    graphics.lineStyle(0.01,b.color,1);	    
 	    pos = find_tip_of_second_arm(b);
-	    graphics.drawRect(pos[0], pos[1], 0.01, 0.01);	    
+	    graphics.drawRect(pos[0], pos[1], 0.01, 0.01);
+	}
+	if (b.name == "secondArmBody") {
+	    var a = new PIXI.Point(pos[0],pos[1]);
+	    var c = graphics.toGlobal(a);
+	    bunny.position.x = c.x;
+	    bunny.position.y = c.y;
+	    bunny.rotation = -b.angle + Math.PI/2;
+	    
 	}
     }
 }
@@ -722,7 +758,7 @@ function init_double_pendulum()
     });
     world.addBody(dummyBody2);
     
-    var armShape =  new p2.Box({ width: L1, height: 0.1*L });
+    var armShape =  new p2.Box({ width: L1, height: 0.03*L });
     armShape.collisionGroup = DOUBLE;            
     armBody = new p2.Body({
         mass: 2,
@@ -737,7 +773,7 @@ function init_double_pendulum()
 
     armBody.name = "armBody";
     world.addBody(armBody);
-    armBody.color =  "0xaaaaaa";
+    armBody.color =  "0xaaaaff";
 
     bodies[armBody.name] = armBody;
 
@@ -817,7 +853,7 @@ function init_single_pendulum()
 	position: single_arm_pos,
     });
     sarmBody.addShape(sarmShape);
-    sarmBody.color =  "0x777777";
+    sarmBody.color =  "0xff7777";
     sarmBody.name = "sarmBody";
     
     sarmBody.angle = initial_angle;
