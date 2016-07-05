@@ -129,7 +129,9 @@ initialize the physics engine perfectly. One might describe this as "rounding er
 
     <p><a href="https://github.com/PubInv/chaos-pendulum">Chaos Pendulum</a> is written and maintained by
 
-<a href="mailto:read.robert@gmail.com">Robert L. Read</a> at <a href="https://github.com/PubInv">PubInv</a>.</p>
+    <a href="mailto:read.robert@gmail.com">Robert L. Read</a> at <a href="https://github.com/PubInv">PubInv</a>.</p>
+
+    <p> This is a newly created work, please send comments, ideas, or suggestions to Rob or open an issue.</p>
 
 
 
