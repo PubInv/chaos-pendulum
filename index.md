@@ -508,8 +508,6 @@ function add_row(ticks,time) {
 		dist_string = "" + dist.toFixed(2) + "m";
 
 		if (DRAW_BRACELET_DEBUGGING_LINES) {
-		    console.log("bracelet length = " + (divergence_interval[1][1] - divergence_interval[1][0]));
-		    console.log(" p start finish "+p+" , "+start + " , "+ finish);
 		    
 		    graphics.beginFill("0xFF0000");
     		    graphics.lineStyle(0.01,"0xff0000",1);
@@ -525,7 +523,6 @@ function add_row(ticks,time) {
 	    } else {
 		new_trace_toggle = true;
 		$("#message_banner").text("Congrats! A new trace found at "+time.toFixed(2)+"s");
-		console.log("NEW TRACE AT: "+ divergence_interval[0]);
 		dist_string = "NA";
 		register_trials(trial_number,trial_initial_angle_diff,time,DIVERGENCE_DEFINITION)
 		trial_number++;
