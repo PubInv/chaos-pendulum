@@ -133,7 +133,7 @@ initialize the physics engine perfectly. One might describe this as "rounding er
 
     <p> This is a newly created work, please send comments, ideas, or suggestions to Rob or open an issue.</p>
 
-
+    <p>Check out our parent project, <a href="https://pubinv.github.io/PubInv">Public Invention</a>.</p>
 
         </section>
 
