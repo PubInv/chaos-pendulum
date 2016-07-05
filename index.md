@@ -1,78 +1,11 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset='utf-8'>
-    <meta http-equiv="X-UA-Compatible" content="chrome=1">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-    <link href='https://fonts.googleapis.com/css?family=Architects+Daughter' rel='stylesheet' type='text/css'>
-    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
-    <link rel="stylesheet" type="text/css" href="stylesheets/github-light.css" media="screen">
-    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print">
-    <script src="./build/p2.js"></script>
-    <script src="./build/p2.renderer.js"></script>    
-    <!--[if lt IE 9]>
-    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
-    <![endif]-->
-
-    <!-- jquery ui stuff -->
-
-    <script   src="https://code.jquery.com/jquery-1.12.4.min.js"   integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ="   crossorigin="anonymous"></script>
-
-
+---
+layout: default
+title: Chaos Pendulum
+---
     
-    <link rel="stylesheet" href="./jquery-ui-1.11.4.custom/jquery-ui.min.css">
-    <link rel="stylesheet" href="./jquery-ui-1.11.4.custom/jquery-ui.structure.min.css">    
-    <link rel="stylesheet" href="./jquery-ui-1.11.4.custom/jquery-ui.theme.min.css">
-
-    <script src="./jquery-ui-1.11.4.custom/jquery-ui.js"></script>
-
-    <title>Chaos-pendulum by PubInv</title>
-    </head>
-
-</body>
-</html>
-    <style>
-#table-wrapper {
-  position:relative;
-}
-#table-scroll {
-  height:100%;
-  overflow:auto;  
-  margin-top:20px;
-}
-#table-wrapper table {
-  width:100%;
-
-}
-#table-wrapper table * {
-  color:black;
-}
-#table-wrapper table thead th .text {
-  position:absolute;   
-  top:-20px;
-  z-index:2;
-  height:20px;
-  width:35%;
-  border:1px solid red;
-}
-
-.newtrace {
-    color: red;
-    font-size: large;
-    background-color: yellow;
-}
-</style>
     
-  <body>
-    <header>
-      <div class="inner">
-        <h1>Chaos-pendulum</h1>
-        <h2>An educational demonstration of the double pendulum producing chaos</h2>
-        <a href="https://github.com/PubInv/chaos-pendulum" class="button"><small>View project on</small> GitHub</a>
-      </div>
-    </header>
-
-    <div id="content-wrapper">
+     
+<div id="content-wrapper">
       <div class="inner clearfix">
         <section id="main-content">
     <section id="visualsection" style="{border: red;}">
@@ -189,24 +122,6 @@ initialize the physics engine perfectly. One might describe this as "rounding er
 
 
         </section>
-
-        <aside id="sidebar">
-<div id="table-wrapper">
-  <div id="table-scroll">
-    <table id="trialtable">
-     <tr>
-    <th>Tick</th>
-    <th>Time (s)</th>
-    <th>Single (deg)</th>
-    <th>Double (deg)</th>
-    <th>Double Pendulum Distance To Standard Trace (m)</th>    
-    </tr>
-    </table>
-  </div>
-</div>    
-        </aside>
-      </div>
-    </div>
 
 
     <audio id="tick" src="http://www.soundjay.com/button/button-19.mp3"></audio>
@@ -1069,5 +984,4 @@ $(function() {
     </script>
 
   
-  </body>
-</html>
+
