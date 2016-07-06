@@ -47,7 +47,7 @@ title: Chaos Pendulum
 
 
 <p>
-    <label for="random_angle_val">Maximum Random Start Deviation (seconds of degrees, 60 seconds = 1 degree)</label>
+    <label for="random_angle_val">Maximum Random Start Deviation (arcminutes of degrees, 60 arcminutes = 1 degree)</label>
   <input type="text" id="random_angle_val" readonly style="border:0; color:#f6931f; font-weight:bold;">
     <div id="random_angle_slider"></div>
 </p>
