@@ -13,11 +13,14 @@ title: Chaos Pendulum
     <section id="textsection" style="{border: red;}">
     <h1 id="message_banner">
     </h1>
+    <h2 id="sub_message">    
+    </h2>
     <button onclick="start_trial()">Start New Trial!</button>
     <button onclick="pause()">Pause</button>
     <button onclick="my_clear()">Clear Traces</button>
     <button onclick="toggle_sound()">Toggle Sound</button>
     <button onclick="toggle_bracelet()">Toggle Bracelet Debug Lines</button>
+    <button onclick="toggle_single()">Toggle Single Pendulum</button>    
 
 
 <p>
@@ -174,11 +177,15 @@ var bgraphs = {};
 var current_time_series = [];
 var last_time_series = [];
 var standard_time_series;
+var best_match_series;
+var best_match_time; // This is in seconds.
+
 
 var renderer, stage, container,  zoom,boxShape, boxBody, planeBody, planeShape;
 
-var graphics;
+var trace_graphics = [];
 var standard_graphics;
+var best_match_graphics;
 
 
 // I THINK P2.js uses the KMS system of units.
@@ -247,6 +254,14 @@ var dummyBody2;
 
 var divergence_interval = [-1,[]];
 
+var NUM_TRACES_TO_SHOW = 4;
+
+var GOOD_GREEN_COLOR = "0x00DD00";
+var GOOD_RED_COLOR = "0xFF3333";
+var GOOD_BLUE_COLOR = "0x3333FF";
+
+var WORLD_STEP = 1/60;
+
 function start_trial() {
     last_time_series = current_time_series;
     // Is this is the first one, record it as standard.
@@ -265,7 +280,38 @@ function start_trial() {
     lastReportTime = null;
     paused = false;
     divergence_interval = [-1,[]];
-    new_trace_toggle = false;    
+    new_trace_toggle = false;
+    for(var i = 0; i < trace_graphics.length; i++) {
+	if (trace_graphics[i] != best_match_graphics) {
+	    trace_graphics[i].alpha *= 0.03;
+	    // Let's desaturate these to make them less distracting!
+//	    trace_graphics[i].tint = "0xaaaaaa";
+	} 
+    }
+    for(var i = NUM_TRACES_TO_SHOW; i < trace_graphics.length; i++) {
+	if (trace_graphics[i] != best_match_graphics) {
+	    container.removeChild(trace_graphics[i]);
+	}
+    }
+    if (best_match_graphics) {
+	
+	render_trace(best_match_graphics,best_match_series,GOOD_GREEN_COLOR);
+    }
+    trace_graphics.slice(0,NUM_TRACES_TO_SHOW-1);
+    trace_graphics.unshift(new PIXI.Graphics());
+    container.addChild(trace_graphics[0]);
+    $("#message_banner").text("New Trial Started!");		    
+}
+
+function render_trace(graphics,time_series,color) {
+    if (graphics && time_series) {
+	for (var i = 0; i < time_series.length; i++) {
+	    graphics.beginFill(color);
+    	    graphics.lineStyle(0.01,color,1);	    
+	    var pos = time_series[i][3];
+	    graphics.drawRect(pos[0], pos[1], 0.01, 0.01);
+	}
+    }
 }
 
 
@@ -310,19 +356,23 @@ function toggle_bracelet() {
     DRAW_BRACELET_DEBUGGING_LINES = !DRAW_BRACELET_DEBUGGING_LINES;
 }
 
+var RENDER_SINGLE = false;
+function toggle_single() {
+    RENDER_SINGLE = !RENDER_SINGLE;
+}
+
 function my_clear() {
-    graphics.clear();
+    for(var i = 0; i < trace_graphics.length; i++) {
+	trace_graphics[i].clear();
+    }
+    render_trace(standard_graphics,standard_time_series,GOOD_RED_COLOR);
+    render_trace(best_match_graphics,best_match_series,GOOD_GREEN_COLOR);    
 }
 
 function random_color() {
     return '0x'+Math.floor(Math.random()*16777215).toString(16);
 }
 
-function gen_row(tick,time,s,d,closest) {
-    return 
-    "<tr>" +
-	"</tr>";
-}
 
 function debug_time_series_distance(t1,t2) {
     for(var i = 0; i < Math.min(t1.length,t2.length); i++) {
@@ -408,7 +458,7 @@ function diverge(ol,i,ts,ds,b) {
     if (ret[1][0] == ret[1][1]) {
 	console.log(ret);
 	console.log("returning nothing");
-	return [p,[]];
+	return [p,[ret[1][0]]];
     }
     return ret;
 }
@@ -446,7 +496,7 @@ function test_diverge0() {
     for(var i = 0; i < s.length; i++) {
 	ds = diverge(s,i,t,ds,b);
 	console.log(ds);
-	if (ds[1].length == 0) {
+	if (ds[1].length != 2) {
 	    divergent.push(i);
 	}
     }
@@ -458,10 +508,6 @@ function test_diverge0() {
     
 }
 
-function tick(ticks,time) {
-    add_row(ticks,time);
-//    playSound('tick');    
-}
 function distance(v1,v2) {
     var dx = v1[0]-v2[0];
     var dy = v1[1]-v2[1];
@@ -470,7 +516,7 @@ function distance(v1,v2) {
 
 var new_trace_toggle = false;
 
-function add_row(ticks,time) {
+function add_row(graphics,ticks,time) {
     var table = document.getElementById("trialtable");
     var b = bodies["secondArmBody"];    
     // Note adding in Math.PI/2 here creates creates a system of positive degrees to the right, negative to the left, probably what we want...
@@ -497,9 +543,10 @@ function add_row(ticks,time) {
 	// NOTE: I should be able to use the vec2 library for this, but can't figure out how to include it!
 	divergence_interval = diverge(current_time_series,len-1,standard_time_series,
 				      divergence_interval,DIVERGENCE_DEFINITION);
+
 	if (!new_trace_toggle) {
-	    if (divergence_interval[1].length > 0) {
-		var p = divergence_interval[0]; // this is on current_time_series
+	    if (divergence_interval[1].length == 2) {
+		var p = divergence_interval[0]; // this is on current_time_series		
 		var start = divergence_interval[1][0];
 		var finish = Math.min(divergence_interval[1][1],standard_time_series.length-1);
 		var median = Math.floor((start + finish)/2); // These are indices, so must be ints.
@@ -508,23 +555,41 @@ function add_row(ticks,time) {
 		dist_string = "" + dist.toFixed(2) + "m";
 
 		if (DRAW_BRACELET_DEBUGGING_LINES) {
-		    
-		    graphics.beginFill("0xFF0000");
-    		    graphics.lineStyle(0.01,"0xff0000",1);
-		    graphics.moveTo(current_time_series[p][3][0],current_time_series[p][3][1]);
-		    graphics.lineTo(standard_time_series[start][3][0],standard_time_series[start][3][1]);
-
 		    graphics.beginFill("0x000000");
-		    graphics.lineStyle(0.01,"0x000000",1);
+		    graphics.lineStyle(0.02*(dist/DIVERGENCE_DEFINITION),"0x000000",1);
 		    
 		    graphics.moveTo(current_time_series[p][3][0],current_time_series[p][3][1]);
-		    graphics.lineTo(standard_time_series[finish][3][0],standard_time_series[finish][3][1]);
+		    graphics.lineTo(standard_time_series[median][3][0],standard_time_series[median][3][1]);
 		}
 	    } else {
+		var final = divergence_interval[1][0];
+		var p = Math.min(current_time_series.length-1,divergence_interval[0]); // this is on current_time_series
 		new_trace_toggle = true;
-		$("#message_banner").text("Congrats! A new trace found at "+time.toFixed(2)+"s");
+		// Now we need to see if this is the best trace....
+		if (DRAW_BRACELET_DEBUGGING_LINES) {
+		    graphics.beginFill("0xFF0000");
+		    dist = distance(cur,standard_time_series[final][3]);
+		    graphics.lineStyle(Math.min(0.1,0.02*(dist/DIVERGENCE_DEFINITION)),"0xFF0000",1);
+		    graphics.moveTo(current_time_series[p][3][0],current_time_series[p][3][1]);
+		    graphics.lineTo(standard_time_series[final][3][0],standard_time_series[final][3][1]);
+		}
+
+		var computed_time = p * WORLD_STEP;
+
+		// now, if we have found the best trace, we will set it so...
+		if (!best_match_series || (best_match_series && (best_match_time < computed_time))) {
+		    best_match_series = current_time_series;
+		    best_match_time = computed_time;
+		    best_match_graphics = graphics;
+		    $("#message_banner").text("Congrats! You've found the closest trace so far at "+computed_time.toFixed(2)+"s");
+		    $("#sub_message").text("Longest Trace so far: "+best_match_time.toFixed(2)+"s");
+		} else {
+		    $("#message_banner").text("Trace diverged at "+computed_time.toFixed(2)+"s");		    
+		}
+
+
 		dist_string = "NA";
-		register_trials(trial_number,trial_initial_angle_diff,time,DIVERGENCE_DEFINITION)
+		register_trials(trial_number,trial_initial_angle_diff,computed_time,DIVERGENCE_DEFINITION);
 		trial_number++;
 	    }
 	}
@@ -590,26 +655,33 @@ function init(){
 
 
     // Draw the box.
-    graphics = new PIXI.Graphics();
+    standard_graphics = new PIXI.Graphics();
 
     add_bodies(container,bodies);
     // Add the box to our container
-    container.addChild(graphics);
+    container.addChild(standard_graphics);
 }
 var bunny;
-function add_bodies(container,bodies,graphics) {
+function add_bodies(container,bodies,standard_graphics) {
     for (var key in bodies) {
 	var b = bodies[key];
         // Draw the box.
         var g = new PIXI.Graphics();
 	bgraphs[key] = g;
-	if (b.name != "secondArmBody") {	
-	g.beginFill(b.color);
-	var w = b.shapes[0].width;
-	var h = b.shapes[0].height;
-	g.drawRect(-w/2, -h/2, w, h);
-	// We want to replace this with the sprite!
-
+	if (b.name == "armBody") {
+	    g.beginFill(b.color);
+	    var w = b.shapes[0].width;
+	    var h = b.shapes[0].height;
+	    g.drawRect(-w/2, -h/2, w, h);
+	    // We want to replace this with the sprite!
+	    container.addChild(g);
+	}
+	if ((b.name == "sarmBody")) {
+	    g.beginFill(b.color);
+	    var w = b.shapes[0].width;
+	    var h = b.shapes[0].height;
+	    g.drawRect(-w/2, -h/2, w, h);
+	    // We want to replace this with the sprite!
 	    container.addChild(g);
 	}
 	if (b.name == "secondArmBody") {
@@ -651,6 +723,7 @@ function find_tip_of_second_arm(b) {
     var pos = [b.position[0]+len*Math.cos(theta),b.position[1]+len*Math.sin(theta)];
     return pos;
 }
+
 function drawBodies(graphics,bs,gs) {
     for (var key in bodies) {
 	var b = bodies[key];
@@ -659,21 +732,20 @@ function drawBodies(graphics,bs,gs) {
 	g.position.x = b.position[0];
 	g.position.y = b.position[1];
 	g.rotation =   b.angle;
-
+	if (b.name == "sarmBody") {
+	    g.visible = RENDER_SINGLE;
+	}
 	if (b.name == "secondArmBody") {
 	    graphics.beginFill(b.color);
     	    graphics.lineStyle(0.01,b.color,1);	    
 	    pos = find_tip_of_second_arm(b);
 	    graphics.drawRect(pos[0], pos[1], 0.01, 0.01);
-	}
-	if (b.name == "secondArmBody") {
 	    var a = new PIXI.Point(pos[0],pos[1]);
 	    var c = graphics.toGlobal(a);
 	    bunny.position.x = c.x;
 	    bunny.position.y = c.y;
 	    bunny.rotation = -b.angle + Math.PI/2;
-	    
-	}
+	} 
     }
 }
 
@@ -722,19 +794,26 @@ function animate(time){
     var deltaTime = lastTime ? (time - lastTime) / 1000 : 0;
     lastTime = time;
 
+    var cur_graphics = (trace_graphics.length == 0) ? standard_graphics : trace_graphics[0];	
+
+
     if ((lastTime - lastReportedTime) >= TICK_MS) {
-	tick(ticks,(lastTime-firstTime)/1000);
+	add_row(cur_graphics,ticks,(lastTime-firstTime)/1000);
 	ticks++;
 	lastReportedTime = lastTime;
     }
     // Make sure the time delta is not too big (can happen if user switches browser tab)
     deltaTime = Math.min(1 / 10, deltaTime);
 
-    fixedDeltaTime = 1/60;
+    fixedDeltaTime = WORLD_STEP;
     // Move physics bodies forward in time
     world.step(fixedDeltaTime, deltaTime, maxSubSteps);
 
-    drawBodies(graphics,bodies,bgraphs);
+    if (trace_graphics.length == 0) {
+	drawBodies(standard_graphics,bodies,bgraphs);
+    } else {
+	drawBodies(trace_graphics[0],bodies,bgraphs);	
+    }
     // Render scene
     renderer.render(stage);
     
@@ -802,7 +881,7 @@ function init_double_pendulum()
     
     secondArmBody.addShape(secondArmShape);
     secondArmBody.name = "secondArmBody";
-    secondArmBody.color = "0x333333";
+    secondArmBody.color = "0xff0000";
     world.addBody(secondArmBody);
 
     bodies[secondArmBody.name] = secondArmBody;    
@@ -821,10 +900,10 @@ function init_double_pendulum()
     
     armBody.angle = initial_angle;
     secondArmBody.angle = hang_angle;
-    world.step(1/60);
+    world.step(WORLD_STEP);
     armBody.angle = initial_angle;
     secondArmBody.angle = hang_angle;
-        world.step(1/60);
+        world.step(WORLD_STEP);
     armBody.angle = initial_angle;
     secondArmBody.angle = hang_angle;
 
@@ -895,7 +974,7 @@ function reset_double_pendulum(random_rads)
     secondArmBody.angularDamping = ANGULAR_DAMPING;
     secondArmBody.damping = LINEAR_DAMPING;            
     
-    secondArmBody.color = random_color();
+    secondArmBody.color = GOOD_BLUE_COLOR;
 }
 
 function reset_single_pendulum(random_rads)
